@@ -1,0 +1,73 @@
+_schema-version: 3.3.0
+ID: service-consumer
+version: 1.0.0-SNAPSHOT
+description: "A simple CAP project."
+parameters:
+  enable-parallel-deployments: true
+modules:
+  - name: service-consumer-srv
+    type: java
+    path: srv
+    parameters:
+      instances: 1
+      buildpack: sap_java_buildpack_jakarta
+    properties:
+      SPRING_PROFILES_ACTIVE: cloud,sandbox
+      JBP_CONFIG_COMPONENTS: "jres: ['com.sap.xs.java.buildpack.jre.SAPMachineJRE']"
+      JBP_CONFIG_SAP_MACHINE_JRE: '{ version: 21.+ }'
+    build-parameters:
+      builder: custom
+      commands:
+        - mvn clean package -DskipTests=true --batch-mode
+      build-result: target/*-exec.jar
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: service-consumer-auth
+      - name: service-consumer-destination
+
+  - name: service-consumer-destinations
+    type: com.sap.application.content
+    requires:
+      - name: service-consumer-auth
+        parameters:
+          service-key:
+            name: service-consumer-auth-key
+      - name: srv-api
+      - name: service-consumer-destination
+        parameters:
+          content-target: true
+    build-parameters:
+      no-source: true
+    parameters:
+      content:
+        subaccount:
+          existing_destinations_policy: update
+          destinations:
+            - Name: service-consumer-srv
+              URL: ~{srv-api/srv-url}
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: service-consumer-auth
+              ServiceKeyName: service-consumer-key
+              HTML5.DynamicDestination: true
+              HTML5.Timeout: 60000
+              WebIDEUsage: odata_gen
+              WebIDEEnabled: true
+
+resources:
+  - name: service-consumer-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: service-consumer-${org}-${space}
+        tenant-mode: dedicated
+  - name: service-consumer-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite

@@ -1,0 +1,9 @@
+@server=http://localhost:8080
+@username=authenticated
+@password=
+
+
+### MyCustomers
+# @name MyCustomers_GET
+GET {{server}}/odata/v4/ConsumerService/MyCustomers
+Authorization: Basic {{username}}:{{password}}

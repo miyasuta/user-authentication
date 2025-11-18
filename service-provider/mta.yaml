@@ -1,0 +1,99 @@
+_schema-version: 3.3.0
+ID: service-provider
+version: 1.0.0-SNAPSHOT
+description: "A simple CAP project."
+parameters:
+  enable-parallel-deployments: true
+modules:
+  - name: service-provider-srv
+    type: java
+    path: srv
+    parameters:
+      instances: 1
+      buildpack: sap_java_buildpack_jakarta
+    properties:
+      SPRING_PROFILES_ACTIVE: cloud,sandbox
+      JBP_CONFIG_COMPONENTS: "jres: ['com.sap.xs.java.buildpack.jre.SAPMachineJRE']"
+      JBP_CONFIG_SAP_MACHINE_JRE: '{ version: 21.+ }'
+    build-parameters:
+      builder: custom
+      commands:
+        - mvn clean package -DskipTests=true --batch-mode
+      build-result: target/*-exec.jar
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: service-provider-auth
+      - name: service-provider-db
+
+  - name: service-provider-db-deployer
+    type: hdb
+    path: db
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: custom
+      commands:
+        - npm run build
+    requires:
+      - name: service-provider-db
+
+  - name: service-provider-destinations
+    type: com.sap.application.content
+    requires:
+      - name: service-provider-auth
+        parameters:
+          service-key:
+            name: service-provider-auth-key
+      - name: srv-api
+      - name: service-provider-destination
+        parameters:
+          content-target: true
+    build-parameters:
+      no-source: true
+    parameters:
+      content:
+        subaccount:
+          existing_destinations_policy: update
+          destinations:
+            - Name: service-provider-srv
+              URL: ~{srv-api/srv-url}
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: service-provider-auth
+              ServiceKeyName: service-provider-key
+              HTML5.DynamicDestination: true
+              HTML5.Timeout: 60000
+              WebIDEUsage: odata_gen
+              WebIDEEnabled: true      
+            - Name: service-provider-srv-cc
+              URL: ~{srv-api/srv-url}
+              Authentication: OAuth2ClientCredentials
+              ServiceInstanceName: service-provider-auth
+              ServiceKeyName: service-provider-key
+              HTML5.DynamicDestination: true
+              HTML5.Timeout: 60000
+              WebIDEUsage: odata_gen
+              WebIDEEnabled: true                
+
+resources:
+  - name: service-provider-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: service-provider-${org}-${space}
+        tenant-mode: dedicated
+  - name: service-provider-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: service-provider-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite

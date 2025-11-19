@@ -51,9 +51,19 @@ cds:
       '[CustomerService]':
         destination:
           name: service-provider-srv
+          # tokenExchangeStrategy: ExchangeOnly
+          # retrievalStrategy: AlwaysSubscriber
         type: odata-v4
         http:
           suffix: /odata/v4
+  security:
+    authentication:
+      normalizeProviderTenant: false
+
+logging:
+  level:
+    com.sap.cloud.sdk: DEBUG
+    com.sap.cds: DEBUG          
 ---
 management:
   endpoint:

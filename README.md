@@ -16,7 +16,7 @@ graph LR
 
 UIとservice-consumerの`xs-security.json`に以下の設定を追加する。
 
-**重要な注意点:**
+**ポイント**
 - ユーザーにこのロールテンプレートを使用したロールコレクションを割り当てる必要はない
 - この設定はOAuth2UserTokenExchangeのために必要
 - OAuth2JWTBearerを使用する場合は不要
